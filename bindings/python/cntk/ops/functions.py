@@ -1200,6 +1200,7 @@ class UserFunction(Function):
             root_gradients = rg
 
         possible_wrt = [input for input in self.inputs if input.needs_gradient]
+        print ("{}: nr of needs_gradient: {}".format(self.name, len(possible_wrt)))
         if len(possible_wrt) > 1:
             self.backward(state, root_gradients, variables)
         else:
