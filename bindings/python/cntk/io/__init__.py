@@ -78,71 +78,141 @@ class MinibatchData(cntk_py.MinibatchData, ArrayMixin):
     def __len__(self):
         return self.num_sequences
 
+@unique
+class TraceLevel(Enum):
+
+    Error = cntk_py.MinibatchSourceConfig.Error
+    Warning = cntk_py.MinibatchSourceConfig.Warning
+    Info = cntk_py.MinibatchSourceConfig.Info
+
 class MinibatchSource(cntk_py.MinibatchSource):
     '''
-    !DEPRECATED! The following multi-parameter constructor is deprecated,
-    Please use :class:`~cntk.io.MinibatchSourceConfig` instead to create 
-    an instance of :class:`~cntk.io.MinibatchSource`.
-
-    MinibatchSource(deserializers=None, randomize=True, randomization_window=cntk.io.DEFAULT_RANDOMIZATION_WINDOW, 
-        epoch_size=cntk.io.INFINITELY_REPEAT, distributed_after=cntk.io.INFINITE_SAMPLES, multithreaded_deserializer=None)
+    MinibatchSource(deserializers, max_samples=cntk.io.INFINITELY_REPEAT, max_sweeps=cntk.io.INFINITELY_REPEAT,
+        randomization_window_in_chunks=cntk.io.DEFAULT_RANDOMIZATION_WINDOW, randomization_window_in_samples=0, 
+        trace_level=cntk.io.TraceLevel.Warning, multithreaded_deserializer=False, frame_mode=False,
+        truncation_length=0, randomize=None, randomization_window=None, sample_based_randomization_window=None,
+        epoch_size=None, distributed_after=None)
 
     Args:
-        deserializers (`list`, defaults to empty): list of deserializers
-        randomize (`bool`, defaults to `True`): randomize before every epoch
-        randomization_window (int): size of window that reader will shuffle, ignored if `randomize`
-          is `False`
-        sample_based_randomization_window (`bool`c, defaults to `False`): specifies how to interpret
-          `randomization_window`. If `True`, the size of the randomization window is interpreted as a certain
-          number of samples, otherwise -- as a number of chunks. Similarly to `randomization_window`,
-          this parameter is ignored, when `randomize` is `False`
-        epoch_size (`int`, defaults to cntk.io.INFINITELY_REPEAT): maximum number of input samples (not 'label samples')
-          the reader can produce. After the specified number of samples has been reached, the reader returns empty 
-          minibatches on subsequent calls to :func:`~cntk.io.MinibatchSource.next_minibatch`. **Important:** 
-          `see <https://github.com/Microsoft/CNTK/wiki/BrainScript-epochSize-and-Python-epoch_size-in-CNTK>`_ 
-          for a description of input and label samples. 
-        multithreaded_deserializer (`bool`, defaults to `False`): using multi threaded deserializer
-        frame_mode (`bool`, defaults to `False`): Specifies if data should be randomized and returned at the frame
-          or sequence level. When  true , input sequence are split into frames.
-        truncation_length (`int`, , defaults to `0`): Specifies the truncation length in samples for BPTT 
-          (positive integer). If greater than zero `frame_mode` cannot be used at the same time.
+        deserializers (a single deserializer or a `list`): deserializers to be used in the composite reader
+        max_samples (`int`, defaults to :const:`cntk.io.INFINITELY_REPEAT`): The maximum number of input samples 
+          (not 'label samples') the reader can produce. After this number has been reached, the reader 
+          returns empty minibatches on subsequent calls to GetNextMinibatch(). `max_samples` and `max_sweeps`
+          are mutually exclusive, an exception will be raised if both have non-default values.
+          **Important:** 
+          `see <https://github.com/Microsoft/CNTK/wiki/BrainScript-epochSize-and-Python-epoch_size-in-CNTK>`__ 
+          for a description of input and label samples.
+        max_sweeps (`int`, defaults to :const:`cntk.io.INFINITELY_REPEAT`): The maximum number of of sweeps over 
+          the input dataset After this number has been reached, the reader returns empty minibatches on 
+          subsequent calls to GetNextMinibatch(). `max_samples` and `max_sweeps` are mutually exclusive, 
+          an exception will be raised if both have non-default values.
+        randomization_window_in_chunks (`int`, defaults to :const:`cntk.io.DEFAULT_RANDOMIZATION_WINDOW_IN_CHUNKS`): 
+          size of the randomization window in chunks, non-zero value enables randomization. 
+          `randomization_window_in_chunks` and `randomization_window_in_samples` are mutually exclusive,
+          an exception will be raised if both have non-zero values.
+        randomization_window_in_samples (`int`, defaults to `0`): size of the randomization window in samples, 
+          non-zero value enables randomization. 
+          `randomization_window_in_chunks` and `randomization_window_in_samples` are mutually exclusive,
+          an exception will be raised if both have non-zero values.
+        trace_level (an instance of :class:`cntk.io.TraceLevel`, defaults to `TraceLevel.Warning`): 
+          the output verbosity level.
+        multithreaded_deserializer (`bool`, defaults to `False`): specifies if the deserialization should be 
+          done on a single or multiple threads.
+        frame_mode (`bool`, defaults to `False`): switches the frame mode on and off. If the frame mode 
+          is enabled the input data will be processed as individual frames ignoring all sequence information 
+          (this option cannot be used for BPTT, an exception will be raised if frame mode is enabled and the
+          truncation length is non-zero).
+        truncation_length (`int`, defaults to `0`): truncation length in samples, non-zero value enables 
+          the truncation (only applicable for BPTT, cannot be used in frame mode, an exception will be raised 
+          if frame mode is enabled and the truncation length is non-zero).
+
+        randomize (`bool`, defaults to `None`): !DEPRECATED! please use randomization_window_in_chunks or
+          randomization_window_in_samples instead
+        randomization_window (int, defaults to `None`): !DEPRECATED! please use randomization_window_in_chunks or
+          randomization_window_in_samples instead
+        sample_based_randomization_window (`bool`, defaults to `None`): !DEPRECATED! please use 
+          randomization_window_in_chunks or randomization_window_in_samples instead
+        epoch_size (`int`, defaults to `None`): !DEPRECATED! please use max_samples or max_sweeps instead 
+        distributed_after (`int`, defaults to `None`): !DEPRECATED!
     '''
     def __init__(self, 
-        deserializers=None,
-        randomize=True,
-        randomization_window=DEFAULT_RANDOMIZATION_WINDOW_IN_CHUNKS,
-        sample_based_randomization_window=False,
-        epoch_size=INFINITELY_REPEAT,
-        distributed_after=None,             #ignored, do not set this parameter
+        deserializers,
+        max_samples = INFINITELY_REPEAT,
+        max_sweeps = INFINITELY_REPEAT,
+        randomization_window_in_chunks = DEFAULT_RANDOMIZATION_WINDOW_IN_CHUNKS,
+        randomization_window_in_samples = 0,
+        trace_level = TraceLevel.Warning,
         multithreaded_deserializer=False,
         frame_mode=False,
-        truncation_length=0):
+        truncation_length=0, 
+        # all parameters below are deprecated
+        randomize=None,
+        randomization_window=None,
+        sample_based_randomization_window=None,
+        epoch_size=None,
+        distributed_after=None):
 
+        if not isinstance(deserializers, (list,tuple)):
+            deserializers = [ deserializers ]
+
+        config = cntk_py.MinibatchSourceConfig(deserializers)
+        config.max_samples = max_samples
+        config.max_sweeps = max_sweeps
+        config.randomization_window_in_chunks = randomization_window_in_chunks
+        config.randomization_window_in_samples = randomization_window_in_samples
+        config.is_multithreaded = multithreaded_deserializer
+        config.is_frame_mode_enabled = frame_mode
+        config.truncation_length = truncation_length
+
+        if isinstance(trace_level, TraceLevel):
+            trace_level = trace_level.value
+
+        config.trace_level = trace_level
+
+        # the following 40 lines deal with deprecated parameters.
         import warnings
-        warnings.warn('This constuctor is deprecated and will be removed '
-            'in future versions. To created a minibatch source, please use '
-            'MinibatchSourceConfig instead', DeprecationWarning)
+        if randomize is not None:
+            warnings.warn('"randomize" parameter is deprecated and will be removed '
+                'in future versions. Please specify "randomization_window_in_chunks" or '
+                '"randomization_window_in_samples" instead', DeprecationWarning)
+        else:
+            randomize = True # previously default value
 
-        config = MinibatchSourceConfig(randomize) \
-                    .set_max_samples(epoch_size) \
-                    .set_multithreaded(multithreaded_deserializer) \
-                    .set_frame_mode(frame_mode);
+        if randomization_window is not None:
+             warnings.warn('"randomization_window" parameter is deprecated and will be removed '
+                'in future versions. Please specify "randomization_window_in_chunks" or '
+                '"randomization_window_in_samples" instead', DeprecationWarning)
+        else:
+            randomization_window = DEFAULT_RANDOMIZATION_WINDOW_IN_CHUNKS # previously default value
 
-        if truncation_length != 0:
-            config.set_truncation_length(truncation_length);
+        if sample_based_randomization_window is not None:
+             warnings.warn('"sample_based_randomization_window" parameter is deprecated and will be removed '
+                'in future versions. Please specify "randomization_window_in_chunks" or '
+                '"randomization_window_in_samples" instead', DeprecationWarning)
+        else:
+            sample_based_randomization_window = False  # previously default value
 
         if (randomize and sample_based_randomization_window):
-            config.set_randomization_window_in_samples(randomization_window);
+            config.randomization_window_in_samples = randomization_window;
+            config.randomization_window_in_chunks = 0;
         elif (randomize and not sample_based_randomization_window):
-            config.set_randomization_window_in_chunks(randomization_window);
+            config.randomization_window_in_chunks = randomization_window;
+            config.randomization_window_in_samples = 0;
+        elif not randomize:
+            config.randomization_window_in_chunks = 0;
+            config.randomization_window_in_samples = 0;
 
-        if isinstance(deserializers, (list,tuple)):
-            for deserializer in deserializers:
-                config.add_deserializer(deserializer)
-        elif deserializers is not None:
-            config.add_deserializer(deserializers)
+        if (epoch_size is not None):
+            warnings.warn('"epoch_size" parameter is deprecated and will be removed '
+                'in future versions. Please specify "max_samples" or '
+                '"max_sweeps" instead', DeprecationWarning)
+            config.max_samples = epoch_size;
 
-        self.source = cntk_py.create_composite_minibatch_source(config)
+         if (distributed_after is not None):
+            warnings.warn('"distributed_after" parameter is deprecated and will be removed '
+                'in future versions.', DeprecationWarning)
+
+        self._source = cntk_py.create_composite_minibatch_source(config)
         self._streams = None
 
 
@@ -153,7 +223,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
         Returns:
             A `list` of instances of :class:`~cntk.cntk_py.StreamInformation`
         '''
-        return self.source.stream_infos()
+        return self._source.stream_infos()
 
     @property
     def streams(self):
@@ -176,7 +246,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
         Throws an exception if there are none or multiple streams with this
         same name.
         '''
-        return self.source.stream_info(name)
+        return self._source.stream_info(name)
 
     def __getitem__(self, name):
         '''
@@ -224,7 +294,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
         if partition_index is None:
             partition_index = 0
 
-        mb = self.source.get_next_minibatch(0,
+        mb = self._source.get_next_minibatch(0,
                 minibatch_size_in_samples, num_data_partitions, partition_index, device)
 
         if not mb:
@@ -243,7 +313,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
             cntk.cntk_py.Dictionary:
             A :class:`~cntk.cntk_py.Dictionary` that has the checkpoint state of the MinibatchSource
         '''
-        return self.source.get_checkpoint_state()
+        return self._source.get_checkpoint_state()
 
     def restore_from_checkpoint(self, checkpoint):
         '''
@@ -252,14 +322,14 @@ class MinibatchSource(cntk_py.MinibatchSource):
         Args:
             checkpoint (:class:`~cntk_py.Dictionary`): checkpoint to restore from
         '''
-        self.source.restore_from_checkpoint(checkpoint)
+        self._source.restore_from_checkpoint(checkpoint)
 
     @property
     def is_distributed(self):
         '''
         Whether the minibatch source is running distributed
         '''
-        return self.source.is_distributed()
+        return self._source.is_distributed()
 
     @property
     def current_position(self):
@@ -280,14 +350,6 @@ class MinibatchSource(cntk_py.MinibatchSource):
             position (:class:`~cntk.cntk_py.Dictionary`): position returned from :func:`~get_current_position`.
         '''
         self.restore_from_checkpoint(position)
-
-
-class _MinibatchSource(MinibatchSource):
-    # this will eventually reaplace the multi-parameter __init__ 
-    # method of the parent, after which this class can be removed.
-    def __init__(self, config):
-        self.source = cntk_py.create_composite_minibatch_source(config)
-        self._streams = None
 
 
 def _py_dict_to_cntk_dict(py_dict):
@@ -312,131 +374,6 @@ def _py_dict_to_cntk_dict(py_dict):
             res[k] = cntk_py.DictionaryValue(v)
     return res
 
-@unique
-class TraceLevel(Enum):
-
-    Error = cntk_py.MinibatchSourceConfig.Error
-    Warning = cntk_py.MinibatchSourceConfig.Warning
-    Info = cntk_py.MinibatchSourceConfig.Info
-    
-
-class MinibatchSourceConfig(cntk_py.MinibatchSourceConfig):
-    '''
-    A configuration that can be used to instantiate the CNTK built-in 
-    composite minibatch source.
-
-    Args:
-        randomize (`bool`, defaults to `True`): enables/disables reader randomization,
-          when randomize is `True` also sets the randomization window size to 
-          `cntk.io.DEFAULT_RANDOMIZATION_WINDOW_IN_CHUNKS`.
-    '''
-    def __init__(self, randomize=True):
-        super(MinibatchSourceConfig, self).__init__(randomize)
-
-    def set_max_samples(self, value):
-        '''
-        Sets the limit on the maximum number of input samples (not 'label samples') the reader 
-        can produce (the default value is `cntk.io.INFINITELY_REPEAT`). After the minimum of 
-        max samples and max sweeps has been reached, the reader returns empty minibatches on subsequent
-        calls to :func:`~cntk.io.MinibatchSource.next_minibatch`. 
-
-        **Important:** `see <https://github.com/Microsoft/CNTK/wiki/BrainScript-epochSize-and-Python-epoch_size-in-CNTK>`_ 
-        for a description of input and label samples. 
-        '''
-        super(MinibatchSourceConfig, self).set_max_samples(value)
-        return self
-
-    def get_max_samples(self):
-        '''
-        Gets the limit on the maximum allowed number of input samples the reader can produce.
-        '''
-        return super(MinibatchSourceConfig, self).get_max_samples()
-
-    def set_max_sweeps(self, value):
-        '''
-        Sets the limit on the maximum allowed number of sweeps over the input dataset 
-        (the default value is `cntk.io.INFINITELY_REPEAT`). After the minimum of max samples 
-        and max sweeps has been reached, reader returns empty minibatches on subsequent 
-        calls to :func:`~cntk.io.MinibatchSource.next_minibatch`.
-        '''
-        super(MinibatchSourceConfig, self).set_max_sweeps(value)
-        return self
-
-    def get_max_sweeps(self):
-        '''
-        Gets the limit on the maximum allowed number of sweeps over the input dataset.
-        '''
-        return super(MinibatchSourceConfig, self).get_max_sweeps()
-
-    def set_randomization_window_in_samples(self, value):
-        '''
-        Sets the size of the randomization window in samples and enables randomization (this 
-        setter overrides the ``randomize`` value used to create this config). If the randomization 
-        window was previously specified in chunks, this new setting takes precedence, effectively
-        overwriting any previous value.
-        '''
-        super(MinibatchSourceConfig, self).set_randomization_window_in_samples(value)
-        return self
-
-    def set_randomization_window_in_chunks(self, value):
-        '''
-        Sets the size of the randomization window in chunks and enables randomization (this 
-        setter overrides the ``randomize`` value used to create this config). If the randomization 
-        window was previously specified in samples, this new setting takes precedence, effectively
-        overwriting any previous value.
-        '''
-        super(MinibatchSourceConfig, self).set_randomization_window_in_chunks(value)
-        return self
-
-    def set_trace_level(self, value):
-        '''
-        Sets the output verbosity level (an instance of :class:`cntk.io.TraceLevel`).
-        '''
-        if isinstance(value, TraceLevel):
-            super(MinibatchSourceConfig, self).set_trace_level(value.value)
-        else:
-            super(MinibatchSourceConfig, self).set_trace_level(value)
-        return self
-
-    def set_truncation_length(self, value):
-        '''
-        Enables the truncation and sets the truncation length in samples (only applicable for BPTT,
-        cannot be used in frame mode).
-        '''
-        super(MinibatchSourceConfig, self).set_truncation_length(value)
-        return self
-
-    def set_frame_mode(self, value=True):
-        '''
-        Toggles the frame mode on and off. If the frame mode is enabled the input data will be processed
-        as individual frames ignoring all sequence information (this option cannot be used for BPTT).
-        '''
-        super(MinibatchSourceConfig, self).set_frame_mode(value)
-        return self
-
-    def set_multithreaded(self, value=True):
-        '''
-        Specifies if the deserialization should be done on a single or multiple threads.
-        '''
-        super(MinibatchSourceConfig, self).set_multithreaded(value)
-        return self
-
-    def add_deserializer(self, value):
-        '''
-        Adds a deserializer to be used in the composite reader.
-        '''
-        super(MinibatchSourceConfig, self).add_deserializer(value)
-        return self
-
-    def create_minibatch_source(self):
-        '''
-        Creates an instance of the CNTK built-in composite minibatch source.
-
-        Returns:
-            An instance of :class:`cntk.io.MinibatchSource` built using
-            parameters specified in this configuration.
-        '''
-        return _MinibatchSource(self)
 
 def HTKFeatureDeserializer(streams):
     '''

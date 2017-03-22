@@ -97,11 +97,11 @@ void TestMinibatchSourceWarmStart(size_t minibatchSize, size_t warmStartSamples,
 
     const size_t numberOfSamplesInSweep = 10000;
 
-    MinibatchSourceConfig config(randomize);
-    config.SetMaxSamples(numberOfSamplesInSweep);
     auto  ctf = CTFDeserializer(L"SimpleDataTrain_cntk_text.txt", { { featureStreamName, inputDim },{ labelsStreamName, numOutputClasses } });
     ctf[L"chunkSizeInBytes"] = chunkSizeInBytes;
-    config.AddDeserializer(ctf);
+    MinibatchSourceConfig config({ ctf }, randomize);
+    config.maxSamples = numberOfSamplesInSweep;
+    
 
     // Let's create two workers.
     auto minibatchSource = CreateCompositeMinibatchSource(config);
@@ -184,8 +184,10 @@ void TestEndOfSweepFlag(size_t maxSamples, size_t mbSize, bool randomize)
     const size_t sweepSize = 603;
     auto ctfInput = L"SimpleDataTest_cntk_text.txt";
     std::vector<StreamConfiguration> streamConfig{ { L"features", 2 } };
-    auto src = CreateCompositeMinibatchSource(MinibatchSourceConfig(randomize)
-        .SetMaxSamples(maxSamples).AddDeserializer(CTFDeserializer(ctfInput, streamConfig)));
+
+    MinibatchSourceConfig config({ CTFDeserializer(ctfInput, streamConfig) }, randomize);
+    config.maxSamples = maxSamples;
+    auto src = CreateCompositeMinibatchSource(config);
 
     maxSamples = (maxSamples == MinibatchSource::FullDataSweep) ? sweepSize : maxSamples;
 
@@ -240,8 +242,10 @@ void TestMaxSweeps(size_t maxSweeps, size_t mbSize, bool randomize)
     const size_t sweepSize = 603;
     auto ctfInput = L"SimpleDataTest_cntk_text.txt";
     std::vector<StreamConfiguration> streamConfig{ { L"features", 2 } };
-    auto src = CreateCompositeMinibatchSource(MinibatchSourceConfig(randomize)
-        .SetMaxSweeps(maxSweeps).AddDeserializer(CTFDeserializer(ctfInput, streamConfig)));
+
+    MinibatchSourceConfig config({ CTFDeserializer(ctfInput, streamConfig) }, randomize);
+    config.maxSweeps = maxSweeps;
+    auto src = CreateCompositeMinibatchSource(config);
 
     auto maxSamples = sweepSize * maxSweeps;
 

@@ -56,8 +56,7 @@ void NoRandomizer::StartEpoch(const EpochConfiguration& config)
 
     if (config.m_totalEpochSizeInSweeps != g_infinity)
     {
-        m_config.m_totalEpochSizeInSamples = 
-            min(m_config.m_totalEpochSizeInSamples, m_sweepSizeInSamples * config.m_totalEpochSizeInSweeps);
+        m_config.m_totalEpochSizeInSamples = m_sweepSizeInSamples * config.m_totalEpochSizeInSweeps;
     }
     else if (m_config.m_totalEpochSizeInSamples == requestDataSize)
         m_config.m_totalEpochSizeInSamples = m_sweepSizeInSamples;
