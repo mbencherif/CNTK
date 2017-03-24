@@ -50,6 +50,9 @@ def test_reasonet(device_id, is_1bit_sgd):
   (train_loss, train_acc, eval_acc) = rsn.train(model, params, learner, train_data, max_epochs=max_epochs, epoch_size=epoch_size, save_model_flag=False, model_name=os.path.basename(data_path), eval_data=eval_data, eval_size=eval_size, check_point_freq=1, minibatch_size = 5000)
   assert abs(train_loss - 0.08067)<1e-2
   assert abs(train_acc - 0.21635)<1e-2
-  assert abs(eval_acc - 0.294)<1e-2
+  if sys.version_info >= (3,):
+    assert abs(eval_acc - 0.294)<1e-2
+  else:
+    assert abs(eval_acc - 0.312)<1e-2
 
-test_reasonet(0, 0)
+#test_reasonet(0, 0)
